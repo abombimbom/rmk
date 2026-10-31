@@ -83,6 +83,18 @@ path = "src/peripheral.rs"
 test = false
 bench = false
 
+[[bin]]
+name = "dongle"
+path = "src/dongle.rs"
+test = false
+bench = false
+
+[[bin]]
+name = "hardreset"
+path = "src/bin/hardreset.rs"
+test = false
+bench = false
+
 [profile.dev]
 codegen-units = 1
 debug = true
