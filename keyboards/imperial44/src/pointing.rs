@@ -1,10 +1,11 @@
 //! Layer-driven pointing mode selection for the Imperial44 trackball dongle.
 //!
-//! Reproduces the ZMK per-layer input processors: motion maps to wheel with an
-//! inverted Y on the scroll layer (divisor 16) and to a slowed cursor on the
-//! sniper layer (divisor 4). Ergohaven pointing-mode user keys override the
-//! layer-derived mode while held; both the Velvet (10/11/12) and K:04
-//! (28/29/30) user-key numbers are accepted.
+//! Reproduces the ZMK per-layer input processors with the user's sensitivity
+//! tuning: the cursor moves at 3/4 of the sensor counts on both axes, the
+//! scroll layer maps motion to wheel with an inverted Y at 1/64, and the
+//! sniper layer slows the cursor to 1/4. Ergohaven pointing-mode user keys
+//! override the layer-derived mode while held; both the Velvet (10/11/12) and
+//! K:04 (28/29/30) user-key numbers are accepted.
 
 use rmk::event::{ActionEvent, LayerChangeEvent, PointingProcessorEvent, publish_event_async};
 use rmk::input_device::pointing::{
@@ -80,8 +81,8 @@ impl LayerPointingMode {
     fn current_mode(&self) -> PointingMode {
         match self.mode_key.mode_override().or(self.layer_mode) {
             Some(PointingModeKind::Scroll) => PointingMode::Scroll(ScrollConfig {
-                divisor_x: 16,
-                divisor_y: 16,
+                divisor_x: 64,
+                divisor_y: 64,
                 invert_y: true,
                 ..Default::default()
             }),
@@ -93,7 +94,13 @@ impl LayerPointingMode {
                 threshold: 16,
                 ..Default::default()
             }),
-            None => PointingMode::Cursor(CursorConfig::default()),
+            None => PointingMode::Cursor(CursorConfig {
+                multiplier_x: 3,
+                divisor_x: 4,
+                multiplier_y: 3,
+                divisor_y: 4,
+                ..Default::default()
+            }),
         }
     }
 

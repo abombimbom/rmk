@@ -42,14 +42,16 @@ matrix_map = """
 [[layer]]
 name = "Base"
 # Minimal factory layers. The real ZMK layout (hold-tap, RU, combos, morse)
-# is ported separately. Trackball buttons: MB1, scroll hold, MB3, MB2,
-# BT profile 0/1.
+# is ported separately. Trackball button row 8 in ZMK input-gpios pin order
+# (P1_11, P1_10, P0_03, P0_28, P0_00, P0_01): MB3 (middle click, hold gives
+# native autoscroll), scroll hold, MB2, MB1, BT next profile, BT profile 0.
+# Sniper mode: hold the scroll button plus the MB3 button on the Scroll layer.
 keys = """
 Escape  Q     W     E     R     T     Y     U     I     O     P     Backspace
 Tab     A     S     D     F     G     H     J     K     L     Semicolon  RGui
 LShift  Z     X     C     V     B     LeftBracket RightBracket N M Comma Dot Quote RShift
                           LCtrl MO(1) Space Enter MO(2) LAlt
-MouseBtn1 MO(3) MouseBtn3 MouseBtn2 User0 User1
+MouseBtn3 MO(3) MouseBtn2 MouseBtn1 User5 User0
 """
 encoders = [["AudioVolUp","AudioVolDown"],["AudioVolUp","AudioVolDown"]]
 
@@ -61,7 +63,7 @@ Escape  Q     W     E     R     T     Y     U     I     O     P     Backspace
 Tab     A     S     D     F     G     H     J     K     L     Semicolon  RGui
 LShift  Z     X     C     V     B     LeftBracket RightBracket N M Comma Dot Quote RShift
                           LCtrl MO(1) Space Enter MO(2) LAlt
-MouseBtn1 MO(3) MouseBtn3 MouseBtn2 User0 User1
+MouseBtn3 MO(3) MouseBtn2 MouseBtn1 User5 User0
 """
 encoders = [["AudioVolUp","AudioVolDown"],["AudioVolUp","AudioVolDown"]]
 
@@ -71,21 +73,21 @@ keys = """
 _  SHIFTED(Kc2)  SHIFTED(Comma)  Equal  SHIFTED(Dot)       Grave           SHIFTED(Kc6)  SHIFTED(Quote)       SHIFTED(Minus)      Quote           _              _
 _  Backslash     SHIFTED(Kc9)    Minus  SHIFTED(Kc0)       SHIFTED(Equal)  SHIFTED(Kc5)  SHIFTED(LeftBracket) Semicolon           SHIFTED(RightBracket) SHIFTED(Kc1) _
 _  SHIFTED(Kc3)  SHIFTED(Kc8)    SHIFTED(Semicolon) Slash  _               _             _                    _                   SHIFTED(Backslash) SHIFTED(Grave) SHIFTED(Kc7) SHIFTED(Kc4) _
-                             _  MO(3)  _  _  _  _
-MouseBtn1 MO(3) MouseBtn3 MouseBtn2 User0 User1
+                             _  MO(3)  DF(0) DF(1) _  _
+MouseBtn3 MO(3) MouseBtn2 MouseBtn1 User5 User0
 """
 encoders = [["AudioVolUp","AudioVolDown"],["AudioVolUp","AudioVolDown"]]
 
 [[layer]]
 name = "Scroll"
-# Motion maps to wheel with inverted Y (matching the ZMK scroll layer);
-# button 2 keeps the scroll hold, button 3 reaches the sniper layer.
+# Motion maps to wheel with inverted Y. The first row-8 button holds the
+# sniper layer here, so scroll hold + that button reaches sniper mode.
 keys = """
 _  _  _  _  _  _                    _  _  _  _  _  _
 _  _  _  _  _  _                    _  _  _  _  _  _
 _  _  _  _  _  _  _  _  _  _  _  _  _  _
             _  _  _  _  _  _
-MouseBtn1 MO(3) MO(4) MouseBtn2 User0 User1
+MO(4) MO(3) MouseBtn2 MouseBtn1 User5 User0
 """
 encoders = [["MouseWheelDown","MouseWheelUp"],["MouseWheelDown","MouseWheelUp"]]
 
@@ -96,7 +98,7 @@ _  _  _  _  _  _                    _  _  _  _  _  _
 _  _  _  _  _  _                    _  _  _  _  _  _
 _  _  _  _  _  _  _  _  _  _  _  _  _  _
             _  _  _  _  _  _
-MouseBtn1 MO(3) MouseBtn3 MouseBtn2 User0 User1
+MO(4) MO(3) MouseBtn2 MouseBtn1 User5 User0
 """
 encoders = [["MouseWheelDown","MouseWheelUp"],["MouseWheelDown","MouseWheelUp"]]
 
@@ -123,6 +125,9 @@ direct_pins = [["P1_11", "P1_10", "P0_03", "P0_28", "P0_00", "P0_01"]]
 # PMW3610 over bitbang SPI, pins transcribed from ergohaven-zmk
 # (boards/arm/ergohaven/ergohaven-pinctrl.dtsi spi0_default and
 # boards/shields/trackball/trackball.dtsi).
+# Axis flags match the Ergohaven Royal build (CONFIG_PMW3610_SWAP_XY,
+# INVERT_X, INVERT_Y): the sensor sits rotated 90° on the PCB, so X and Y
+# are exchanged in hardware and both axes are inverted.
 [[split.central.input_device.pmw3610]]
 name = "trackball0"
 spi.instance = "bitbang0"
@@ -131,7 +136,10 @@ spi.mosi = "P0_17"
 spi.miso = "P0_17"
 spi.cs = "P0_13"
 motion = "P0_15"
-cpi = 400
+cpi = 1000
+swap_xy = true
+invert_x = true
+invert_y = true
 force_awake = true
 report_hz = 125
 
@@ -170,6 +178,31 @@ pin_b = "P1_00"
 phase = "resolution"
 resolution = 2
 internal_pullup = true
+
+# Language layers: DF(layer) makes the layer default, deactivates all other
+# layers and sends the bound macro. The macros are the OS input-layout hotkeys:
+# Ctrl+Shift+1 selects the first layout (EN), Ctrl+Shift+2 the second (RU).
+[[behavior.macro.macros]]
+operations = [
+  { operation = "down", keycode = "LCtrl" },
+  { operation = "down", keycode = "LShift" },
+  { operation = "tap", keycode = "Kc1" },
+  { operation = "up", keycode = "LShift" },
+  { operation = "up", keycode = "LCtrl" },
+]
+
+[[behavior.macro.macros]]
+operations = [
+  { operation = "down", keycode = "LCtrl" },
+  { operation = "down", keycode = "LShift" },
+  { operation = "tap", keycode = "Kc2" },
+  { operation = "up", keycode = "LShift" },
+  { operation = "up", keycode = "LCtrl" },
+]
+
+[behavior.language_layer]
+en = { layer = 0, macro = 0 }
+ru = { layer = 1, macro = 1 }
 
 [rmk]
 split_peripherals_num = 2
