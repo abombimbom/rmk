@@ -29,7 +29,7 @@ use crate::keyboard::mouse::{MouseAction, MouseState};
 use crate::keyboard::oneshot::OneShotState;
 use crate::keyboard_macros::MacroOperation;
 use crate::keymap::KeyMap;
-use crate::{COMBO_MAX_NUM, FORK_MAX_NUM, MACRO_SPACE_SIZE, boot};
+use crate::{COMBO_MAX_NUM, FORK_MAX_NUM, LANGUAGE_LAYER_TABLE, MACRO_SPACE_SIZE, boot};
 
 pub(crate) mod auto_mouse_layer;
 pub mod combo;
@@ -1400,6 +1400,25 @@ impl<'a> Keyboard<'a> {
         .await;
 
         if let Action::TriggerMacro(macro_idx) = action {
+            self.execute_macro(macro_idx, event).await;
+            return;
+        }
+
+        // Language layer: on release, a table layer snaps to its language —
+        // deactivate all other layers and send the layout-switch macro bound
+        // to it in keyboard.toml ([behavior.language_layer]). Layers outside
+        // the table keep the plain default-layer switch below.
+        if let Action::DefaultLayer(layer_num) = action
+            && !event.pressed
+            && let Some(&(_, macro_idx)) = LANGUAGE_LAYER_TABLE.iter().find(|(layer, _)| *layer == layer_num)
+        {
+            self.keymap.set_default_layer(layer_num);
+            let (_, _, num_layer) = self.keymap.get_keymap_config();
+            for i in 0..num_layer as u8 {
+                if i != layer_num {
+                    self.keymap.deactivate_layer(i);
+                }
+            }
             self.execute_macro(macro_idx, event).await;
             return;
         }

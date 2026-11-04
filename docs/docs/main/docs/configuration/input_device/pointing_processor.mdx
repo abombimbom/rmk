@@ -12,12 +12,14 @@ Maps X/Y deltas directly to mouse cursor movement with optional scaling.
 rmk::input_device::pointing::CursorConfig {
     multiplier_x: 1, // scales X delta. 0 disables X.
     multiplier_y: 1, // scales Y delta. 0 disables Y.
+    divisor_x: 1,    // divides X motion. 0 disables X.
+    divisor_y: 1,    // divides Y motion. 0 disables Y.
     invert_x: false,
     invert_y: false,
 }
 ```
 
-Formula: `output = delta * multiplier`. No accumulator and no divisor — every sample is processed immediately. Small movements are never swallowed, which is exactly what you want for cursor tracking.
+Formula: `output = delta * multiplier / divisor`. With the default divisor of 1 every sample is processed immediately and small movements are never swallowed, which is exactly what you want for cursor tracking. A divisor above 1 routes the axis through the `MotionAccumulator` (same as Scroll mode), so sub-unit motion accumulates instead of being lost.
 
 ### Scroll
 

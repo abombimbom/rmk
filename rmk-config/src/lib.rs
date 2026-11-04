@@ -648,6 +648,7 @@ pub(crate) struct BehaviorConfig {
     pub fork: Option<ForksConfig>,
     pub morse: Option<MorsesConfig>,
     pub auto_mouse_layer: Option<Vec<AutoMouseLayerConfig>>,
+    pub language_layer: Option<LanguageLayersConfig>,
 }
 
 /// Configurations for auto mouse layer
@@ -766,6 +767,64 @@ pub(crate) enum MacroOperation {
     Up { keycode: String },
     Delay { duration: DurationMillis },
     Text { text: String },
+}
+
+/// Max entries in [behavior.language_layer]
+pub(crate) const LANGUAGE_LAYER_MAX_NUM: usize = 8;
+
+/// Configurations for language layers
+///
+/// Each entry binds a layer to a macro: pressing `DF(layer)` deactivates all
+/// other layers and runs the macro, which switches the OS input layout.
+#[derive(Clone, Debug, Default)]
+pub(crate) struct LanguageLayersConfig {
+    pub entries: Vec<LanguageLayerEntry>,
+}
+
+impl<'de> Deserialize<'de> for LanguageLayersConfig {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = HashMap::<String, LanguageLayerEntryRaw>::deserialize(deserializer)?;
+        if raw.len() > LANGUAGE_LAYER_MAX_NUM {
+            return Err(serde::de::Error::custom(format!(
+                "number of language layers ({}) exceeds {LANGUAGE_LAYER_MAX_NUM}",
+                raw.len()
+            )));
+        }
+        let mut entries: Vec<LanguageLayerEntry> = raw
+            .into_iter()
+            .map(|(name, e)| LanguageLayerEntry {
+                name,
+                layer: e.layer,
+                macro_idx: e.macro_idx,
+            })
+            .collect();
+        // Sort by layer for a deterministic order regardless of table key order
+        entries.sort_by(|a, b| a.layer.cmp(&b.layer).then(a.name.cmp(&b.name)));
+        Ok(Self { entries })
+    }
+}
+
+/// Language layer entry
+#[derive(Clone, Debug)]
+pub(crate) struct LanguageLayerEntry {
+    /// Language name — the key in [behavior.language_layer] (e.g. `en`, `ru`)
+    pub name: String,
+    /// Layer activated by `DF(layer)`
+    pub layer: u8,
+    /// Index of the macro with the OS layout-switch hotkey
+    pub macro_idx: u8,
+}
+
+/// TOML-level language layer entry; the language name comes from the table key
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct LanguageLayerEntryRaw {
+    layer: u8,
+    #[serde(rename = "macro")]
+    macro_idx: u8,
 }
 
 /// Configurations for forks
@@ -1367,5 +1426,55 @@ subs = 2
         assert_eq!(config.event.layer_change.channel_size, 1);
         assert_eq!(config.event.layer_change.pubs, 2);
         assert_eq!(config.event.layer_change.subs, 2);
+    }
+
+    #[test]
+    fn test_language_layer_config_parsing() {
+        let user_toml = r#"
+[behavior.language_layer]
+en = { layer = 0, macro = 0 }
+ru = { layer = 1, macro = 1 }
+"#;
+        let config: KeyboardTomlConfig = Config::builder()
+            .add_source(File::from_str(EVENT_DEFAULT_CONFIG, FileFormat::Toml))
+            .add_source(File::from_str(user_toml, FileFormat::Toml))
+            .build()
+            .unwrap()
+            .try_deserialize()
+            .unwrap();
+
+        let entries = &config
+            .behavior
+            .as_ref()
+            .unwrap()
+            .language_layer
+            .as_ref()
+            .unwrap()
+            .entries;
+        assert_eq!(entries.len(), 2);
+        // Entries are sorted by layer
+        assert_eq!(entries[0].name, "en");
+        assert_eq!((entries[0].layer, entries[0].macro_idx), (0, 0));
+        assert_eq!(entries[1].name, "ru");
+        assert_eq!((entries[1].layer, entries[1].macro_idx), (1, 1));
+    }
+
+    #[test]
+    fn test_language_layer_config_absent() {
+        let user_toml = r#"
+[behavior.one_shot]
+timeout = "200ms"
+"#;
+        let config: KeyboardTomlConfig = Config::builder()
+            .add_source(File::from_str(EVENT_DEFAULT_CONFIG, FileFormat::Toml))
+            .add_source(File::from_str(user_toml, FileFormat::Toml))
+            .build()
+            .unwrap()
+            .try_deserialize()
+            .unwrap();
+
+        let behavior = config.behavior.as_ref().unwrap();
+        assert!(behavior.one_shot.is_some());
+        assert!(behavior.language_layer.is_none());
     }
 }

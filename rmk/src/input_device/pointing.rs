@@ -383,6 +383,10 @@ pub struct CursorConfig {
     pub multiplier_x: u8,
     /// Multiplier for Y axis. Higher = more output per unit of motion. 0 disables Y.
     pub multiplier_y: u8,
+    /// Divisor for X axis. Higher = less output per unit of motion. 0 disables X.
+    pub divisor_x: u8,
+    /// Divisor for Y axis. Higher = less output per unit of motion. 0 disables Y.
+    pub divisor_y: u8,
     /// Invert X axis movement.
     pub invert_x: bool,
     /// Invert Y axis movement.
@@ -394,6 +398,8 @@ impl Default for CursorConfig {
         Self {
             multiplier_x: 1,
             multiplier_y: 1,
+            divisor_x: 1,
+            divisor_y: 1,
             invert_x: false,
             invert_y: false,
         }
@@ -1596,8 +1602,12 @@ impl<'a> PointingProcessor<'a> {
                 // modes that generate mouse reports
                 let mouse_report = match self.current_mode {
                     PointingMode::Cursor(cursor_config) => {
-                        let out_x = x.saturating_mul(cursor_config.multiplier_x as i16);
-                        let out_y = y.saturating_mul(cursor_config.multiplier_y as i16);
+                        let (out_x, out_y) = self.accumulator.accumulate(
+                            x,
+                            y,
+                            (cursor_config.multiplier_x, cursor_config.divisor_x),
+                            (cursor_config.multiplier_y, cursor_config.divisor_y),
+                        );
                         let out_x = if cursor_config.invert_x { -out_x } else { out_x };
                         let out_y = if cursor_config.invert_y { -out_y } else { out_y };
                         MouseReport {
@@ -4239,6 +4249,8 @@ mod tests {
         let config = CursorConfig {
             multiplier_x: 2,
             multiplier_y: 3,
+            divisor_x: 1,
+            divisor_y: 1,
             invert_x: false,
             invert_y: false,
         };
@@ -4247,10 +4259,26 @@ mod tests {
     }
 
     #[test]
+    fn test_pointing_cursor_ratio_scales_motion() {
+        let mut acc = MotionAccumulator::default();
+        let (mut x, mut y) = (0, 0);
+        for _ in 0..8 {
+            let (dx, dy) = acc.accumulate(10, 10, (3, 4), (3, 8));
+            x += dx;
+            y += dy;
+        }
+        // 8 samples of 10 at ratio 3/4 → 60; at 3/8 → 30.
+        assert_eq!(x, 60);
+        assert_eq!(y, 30);
+    }
+
+    #[test]
     fn test_pointing_cursor_invert_axes() {
         let config = CursorConfig {
             multiplier_x: 1,
             multiplier_y: 1,
+            divisor_x: 1,
+            divisor_y: 1,
             invert_x: true,
             invert_y: true,
         };

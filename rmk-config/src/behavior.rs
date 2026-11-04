@@ -69,6 +69,30 @@ impl crate::KeyboardTomlConfig {
                         ));
                     }
                 }
+                behavior.language_layer = behavior.language_layer.or(default.language_layer);
+                if let Some(language_layers) = &behavior.language_layer {
+                    let macros_num = behavior.macros.as_ref().map_or(0, |m| m.macros.len());
+                    for (i, entry) in language_layers.entries.iter().enumerate() {
+                        if entry.layer >= layout.layers {
+                            return Err(format!(
+                                "keyboard.toml: language layer '{}' (layer {}) is greater than [layout.layers] = {}",
+                                entry.name, entry.layer, layout.layers
+                            ));
+                        }
+                        if entry.macro_idx as usize >= macros_num {
+                            return Err(format!(
+                                "keyboard.toml: language layer '{}' references macro {} but only {} macros are defined in [behavior.macro]",
+                                entry.name, entry.macro_idx, macros_num
+                            ));
+                        }
+                        if let Some(dup) = language_layers.entries[..i].iter().find(|e| e.layer == entry.layer) {
+                            return Err(format!(
+                                "keyboard.toml: language layers '{}' and '{}' share the same layer {}",
+                                dup.name, entry.name, entry.layer
+                            ));
+                        }
+                    }
+                }
                 behavior.fork = behavior.fork.or(default.fork);
                 if let Some(fork) = &behavior.fork
                     && fork.forks.len() > self.rmk.fork_max_num
